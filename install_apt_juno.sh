@@ -183,7 +183,7 @@ EOF
 }
 
 case "$1" in
-"compute")
+"compute" | "computing")
 	install_compute
 	exit $?
 	;;
