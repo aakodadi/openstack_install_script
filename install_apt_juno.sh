@@ -28,7 +28,8 @@ install_controller()
 {
 	echo "######## Installing the Controller Node..."
 	install_common
-	apt-get -y install keystone python-keystoneclient mariadb-server rabbitmq-server
+	apt-get -y install keystone python-keystoneclient mariadb-server mysql rabbitmq-server
+	# Configure Networking
 	cat > /etc/network/interfaces <<EOF
 auto lo
 iface lo inet loopback
@@ -46,6 +47,7 @@ iface $CONTROLLER_NODE_API_IFACE_NAME inet static
 auto $CONTROLLER_NODE_NAT_IFACE_NAME
 iface $CONTROLLER_NODE_NAT_IFACE_NAME inet dhcp
 EOF
+	# Configure NTP
 	cat > /etc/ntp.conf <<EOF
 driftfile /var/lib/ntp/ntp.drift
 
@@ -53,6 +55,7 @@ server 3.pool.ntp.org iburst
 restrict -4 default kod notrap nomodify
 restrict -6 default kod notrap nomodify
 EOF
+	# Configure Hostnames
 	hostname $CONTROLLER_NODE_HOSTNAME
 	echo $CONTROLLER_NODE_HOSTNAME > /etc/hostname
 	cat > /etc/hosts <<EOF
@@ -67,6 +70,15 @@ ff02::2 ip6-allrouters
 $NETWORK_NODE_MGMT_IP_ADDR $NETWORK_NODE_HOSTNAME
 $COMPUTE_NODE_MGMT_IP_ADDR $COMPUTE_NODE_HOSTNAME
 EOF
+	# configure mariadb-server
+	sed -i "2i bind-address=$CONTROLLER_NODE_MGMT_IP_ADDR" /etc/mysql/my.cnf
+	sed -i "3i default-storage-engine=innodb" /etc/mysql/my.cnf
+	sed -i "4i innodb_file_per_table" /etc/mysql/my.cnf
+	sed -i "5i collation-server=utf8_general_ci" /etc/mysql/my.cnf
+	sed -i "6i init-connect='SET NAMES utf8'" /etc/mysql/my.cnf
+	sed -i "7i character-set-server=utf8" /etc/mysql/my.cnf
+	service mysql restart
+	mysql_secure_installation
 	rabbitmqctl change_password guest $RABBIT_PASS
 	mysqladmin -u root password $DB_PASS
 	mysqladmin -u root -h $CONTROLLER_NODE_HOSTNAME password $DB_PASS
@@ -77,6 +89,7 @@ install_networking()
 {
 	echo "####### Installing the Network Node..."
 	install_common
+	# Configure Networking
 	cat > /etc/network/interfaces <<EOF
 auto lo
 iface lo inet loopback
@@ -99,11 +112,13 @@ iface $NETWORK_NODE_API_IFACE_NAME inet static
 auto $NETWORK_NODE_NAT_IFACE_NAME
 iface $NETWORK_NODE_NAT_IFACE_NAME inet dhcp
 EOF
+	# Configure NTP
 	cat > /etc/ntp.conf <<EOF
 driftfile /var/lib/ntp/ntp.drift
 
 server $CONTROLLER_NODE_HOSTNAME iburst
 EOF
+	# Configure Hostnames
 	hostname $NETWORK_NODE_HOSTNAME
 	echo $NETWORK_NODE_HOSTNAME > /etc/hostname
 	cat > /etc/hosts <<EOF
@@ -125,6 +140,7 @@ install_compute()
 {
 	echo "###### Installing a Compute Node..."
 	install_common
+	# Configure Networking
 	cat > /etc/network/interfaces <<EOF
 auto lo
 iface lo inet loopback
@@ -142,11 +158,13 @@ iface $COMPUTE_NODE_TUN_IFACE_NAME inet static
 auto $COMPUTE_NODE_NAT_IFACE_NAME
 iface $COMPUTE_NODE_NAT_IFACE_NAME inet dhcp
 EOF
+	# Configure NTP
 	cat > /etc/ntp.conf <<EOF
 driftfile /var/lib/ntp/ntp.drift
 
 server $CONTROLLER_NODE_HOSTNAME iburst
 EOF
+	# Configure Hostnames
 	hostname $COMPUTE_NODE_HOSTNAME
 	echo $COMPUTE_NODE_HOSTNAME > /etc/hostname
 	cat > /etc/hosts <<EOF
